@@ -1,0 +1,1796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>From Request to Response — Pilot Prototype</title>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --panel: #121932;
+      --panel-2: #182140;
+      --line: rgba(255,255,255,0.08);
+      --text: #e8ecf6;
+      --muted: #9ca6bf;
+      --accent: #60a5fa;
+      --accent-2: #2dd4bf;
+      --green: #22c55e;
+      --amber: #f59e0b;
+      --red: #ef4444;
+      --shadow: 0 18px 50px rgba(0,0,0,0.28);
+      --radius: 18px;
+      --radius-sm: 12px;
+      --max: 1380px;
+      --font: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: var(--font);
+      color: var(--text);
+      background:
+        radial-gradient(circle at top right, rgba(96,165,250,0.18), transparent 28%),
+        radial-gradient(circle at top left, rgba(45,212,191,0.12), transparent 22%),
+        linear-gradient(180deg, #09101f 0%, #0d1427 100%);
+      min-height: 100vh;
+    }
+
+    a { color: inherit; }
+    button, input, select, textarea { font: inherit; }
+
+    .shell {
+      max-width: var(--max);
+      margin: 0 auto;
+      padding: 24px;
+    }
+
+    .hero {
+      position: relative;
+      overflow: hidden;
+      border: 1px solid var(--line);
+      background:
+        linear-gradient(135deg, rgba(18,25,50,0.96), rgba(11,16,32,0.94)),
+        linear-gradient(135deg, rgba(96,165,250,0.10), rgba(45,212,191,0.10));
+      border-radius: 28px;
+      box-shadow: var(--shadow);
+      padding: 28px;
+      margin-bottom: 20px;
+    }
+
+    .hero::before,
+    .hero::after {
+      content: "";
+      position: absolute;
+      pointer-events: none;
+      border-radius: 999px;
+      filter: blur(24px);
+      opacity: 0.45;
+    }
+
+    .hero::before {
+      width: 320px;
+      height: 320px;
+      right: -80px;
+      top: -80px;
+      background: rgba(96, 165, 250, 0.24);
+    }
+
+    .hero::after {
+      width: 260px;
+      height: 260px;
+      left: -80px;
+      bottom: -110px;
+      background: rgba(45, 212, 191, 0.18);
+    }
+
+    .eyebrow {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      padding: 8px 12px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 999px;
+      color: var(--muted);
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    .hero-top {
+      display: flex;
+      gap: 18px;
+      align-items: flex-start;
+      justify-content: space-between;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-copy {
+      max-width: 760px;
+    }
+
+    h1 {
+      margin: 14px 0 12px;
+      font-size: clamp(30px, 5vw, 48px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+    }
+
+    .hero p {
+      margin: 0;
+      color: #c9d1e5;
+      line-height: 1.6;
+      max-width: 72ch;
+    }
+
+    .hero-actions {
+      display: flex;
+      gap: 12px;
+      margin-top: 22px;
+      flex-wrap: wrap;
+    }
+
+    .button {
+      border: 0;
+      border-radius: 999px;
+      padding: 12px 18px;
+      cursor: pointer;
+      transition: transform 180ms ease, box-shadow 180ms ease, opacity 180ms ease;
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      white-space: nowrap;
+    }
+
+    .button:hover { transform: translateY(-1px); }
+    .button:active { transform: translateY(0); }
+
+    .button.primary {
+      background: linear-gradient(135deg, var(--accent), #7c9cff);
+      color: #04101f;
+      box-shadow: 0 10px 24px rgba(96, 165, 250, 0.24);
+      font-weight: 700;
+    }
+
+    .button.ghost {
+      background: rgba(255,255,255,0.05);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.09);
+    }
+
+    .status-stack {
+      display: grid;
+      gap: 10px;
+      min-width: 280px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .status-card {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 16px;
+      padding: 14px;
+    }
+
+    .status-card h3 {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .status-card strong {
+      display: block;
+      font-size: 18px;
+      margin-bottom: 6px;
+    }
+
+    .tag-row {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      margin-top: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.06);
+      color: #dfe7fb;
+      border: 1px solid rgba(255,255,255,0.08);
+      font-size: 13px;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin: 0 0 18px;
+    }
+
+    .tab {
+      background: rgba(255,255,255,0.04);
+      color: var(--muted);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 999px;
+      padding: 10px 14px;
+      cursor: pointer;
+      transition: all 180ms ease;
+    }
+
+    .tab.active {
+      background: rgba(96,165,250,0.12);
+      color: #eaf3ff;
+      border-color: rgba(96,165,250,0.35);
+      box-shadow: inset 0 0 0 1px rgba(96,165,250,0.12);
+    }
+
+    .view {
+      display: none;
+      gap: 18px;
+    }
+
+    .view.active { display: grid; }
+
+    .two-col {
+      grid-template-columns: 1.2fr 0.8fr;
+    }
+
+    .card {
+      background: linear-gradient(180deg, rgba(18,25,50,0.96), rgba(11,16,32,0.96));
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .card-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 18px 20px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,255,255,0.02);
+    }
+
+    .card-head h2,
+    .card-head h3 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: -0.02em;
+    }
+
+    .sub {
+      color: var(--muted);
+      font-size: 14px;
+      line-height: 1.5;
+      margin-top: 6px;
+    }
+
+    .card-body {
+      padding: 20px;
+    }
+
+    .grid-2,
+    .grid-3,
+    .grid-4 {
+      display: grid;
+      gap: 16px;
+    }
+
+    .grid-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .grid-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+
+    .field {
+      display: grid;
+      gap: 8px;
+    }
+
+    label {
+      font-size: 13px;
+      color: #dbe3f8;
+      font-weight: 600;
+    }
+
+    .helper {
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.5;
+      margin-top: -2px;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      border-radius: 14px;
+      border: 1px solid rgba(255,255,255,0.10);
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      padding: 12px 14px;
+      outline: none;
+      transition: border-color 160ms ease, box-shadow 160ms ease;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: rgba(96,165,250,0.55);
+      box-shadow: 0 0 0 3px rgba(96,165,250,0.10);
+    }
+
+    textarea { min-height: 108px; resize: vertical; }
+
+    .toolbar {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+
+    .example-row {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .example-btn {
+      background: rgba(255,255,255,0.04);
+      color: var(--text);
+      border: 1px solid rgba(255,255,255,0.07);
+      padding: 10px 12px;
+      border-radius: 12px;
+      cursor: pointer;
+      text-align: left;
+      min-width: 200px;
+    }
+
+    .example-btn small { color: var(--muted); display: block; margin-top: 5px; }
+
+    .score {
+      border-radius: 14px;
+      padding: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.08);
+    }
+
+    .score strong {
+      display: block;
+      font-size: 28px;
+      margin-bottom: 6px;
+      letter-spacing: -0.03em;
+    }
+
+    .mini {
+      font-size: 12px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+
+    .progress-wrap {
+      display: grid;
+      gap: 8px;
+      margin-bottom: 18px;
+    }
+
+    .progress-track {
+      height: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      width: 0;
+      background: linear-gradient(90deg, var(--accent), var(--accent-2));
+      transition: width 260ms ease;
+    }
+
+    .route-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 999px;
+      font-weight: 700;
+      font-size: 13px;
+      letter-spacing: 0.02em;
+    }
+
+    .route-green {
+      background: rgba(34,197,94,0.14);
+      color: #b8f2c9;
+      border: 1px solid rgba(34,197,94,0.35);
+    }
+
+    .route-amber {
+      background: rgba(245,158,11,0.14);
+      color: #ffe2a7;
+      border: 1px solid rgba(245,158,11,0.32);
+    }
+
+    .route-red {
+      background: rgba(239,68,68,0.14);
+      color: #ffc7c7;
+      border: 1px solid rgba(239,68,68,0.30);
+    }
+
+    .list,
+    .log-list,
+    .review-list {
+      display: grid;
+      gap: 10px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .list li,
+    .log-list li,
+    .review-item {
+      border-radius: 14px;
+      padding: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .section-title {
+      margin: 0 0 10px;
+      font-size: 15px;
+      color: #e8ecf6;
+      letter-spacing: -0.01em;
+    }
+
+    .divider {
+      height: 1px;
+      background: var(--line);
+      margin: 18px 0;
+    }
+
+    .pack-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: 1fr 1fr;
+    }
+
+    .pack-card {
+      border-radius: 16px;
+      padding: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .pack-card h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .pack-card p,
+    .pack-card li {
+      color: #d9e0f1;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .evidence-tag,
+    .risk-tag,
+    .state-tag {
+      display: inline-flex;
+      align-items: center;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      border: 1px solid rgba(255,255,255,0.08);
+      background: rgba(255,255,255,0.05);
+      color: #d9e3fb;
+      margin: 0 6px 6px 0;
+    }
+
+    .evidence-tag.grounded {
+      background: rgba(96,165,250,0.11);
+      border-color: rgba(96,165,250,0.24);
+      color: #d7ebff;
+    }
+
+    .evidence-tag.inference {
+      background: rgba(245,158,11,0.11);
+      border-color: rgba(245,158,11,0.24);
+      color: #ffe7bb;
+    }
+
+    .metric-card {
+      padding: 16px;
+      border-radius: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    .metric-card strong {
+      display: block;
+      font-size: 26px;
+      margin-top: 8px;
+    }
+
+    .delta.up { color: #8bf0b0; }
+    .delta.down { color: #ffb4b4; }
+
+    .bar-compare {
+      display: grid;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .bar-row {
+      display: grid;
+      grid-template-columns: 120px 1fr 70px;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .bar-track {
+      height: 10px;
+      background: rgba(255,255,255,0.08);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, rgba(96,165,250,0.92), rgba(45,212,191,0.92));
+      border-radius: 999px;
+    }
+
+    .baseline .bar-fill {
+      background: rgba(156,166,191,0.5);
+    }
+
+    .architecture {
+      display: grid;
+      gap: 14px;
+    }
+
+    .flow-row {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(7, minmax(0, 1fr));
+      align-items: stretch;
+    }
+
+    .agent-box,
+    .human-box,
+    .artifact-box {
+      border-radius: 16px;
+      padding: 14px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+      position: relative;
+      min-height: 146px;
+    }
+
+    .agent-box::after,
+    .human-box::after {
+      content: "→";
+      position: absolute;
+      top: 50%;
+      right: -12px;
+      transform: translateY(-50%);
+      color: var(--muted);
+      font-size: 22px;
+    }
+
+    .flow-row > :last-child::after { display: none; }
+
+    .agent-box h4,
+    .human-box h4,
+    .artifact-box h4 {
+      margin: 0 0 8px;
+      font-size: 14px;
+      letter-spacing: -0.01em;
+    }
+
+    .agent-box p,
+    .human-box p,
+    .artifact-box p {
+      color: #d6def2;
+      font-size: 13px;
+      line-height: 1.55;
+      margin: 0;
+    }
+
+    .safeguards {
+      display: grid;
+      gap: 14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .guardrail {
+      border-radius: 16px;
+      padding: 16px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.06);
+    }
+
+    .guardrail h4 {
+      margin: 0 0 8px;
+      font-size: 15px;
+    }
+
+    .guardrail p,
+    .guardrail li {
+      color: #d8e2f8;
+      line-height: 1.58;
+      font-size: 14px;
+    }
+
+    .note {
+      padding: 14px 16px;
+      border-radius: 14px;
+      background: rgba(96,165,250,0.08);
+      border: 1px solid rgba(96,165,250,0.18);
+      color: #dcecff;
+      line-height: 1.6;
+      font-size: 14px;
+    }
+
+    .review-item {
+      display: grid;
+      gap: 10px;
+    }
+
+    .review-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+
+    .review-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .review-actions .button {
+      padding: 10px 12px;
+      border-radius: 12px;
+      font-size: 13px;
+    }
+
+    .footer-note {
+      margin-top: 18px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.6;
+    }
+
+    .mono {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+    }
+
+    @media (max-width: 1180px) {
+      .two-col,
+      .flow-row,
+      .grid-4,
+      .grid-3,
+      .pack-grid,
+      .safeguards {
+        grid-template-columns: 1fr;
+      }
+
+      .agent-box::after,
+      .human-box::after { display: none; }
+
+      .status-stack { min-width: 0; width: 100%; }
+      .hero-top { flex-direction: column; }
+    }
+
+    @media (max-width: 800px) {
+      .shell { padding: 16px; }
+      .grid-2 { grid-template-columns: 1fr; }
+      .bar-row { grid-template-columns: 100px 1fr 56px; }
+      .hero { padding: 22px; }
+      .tabs { gap: 8px; }
+      .tab { width: calc(50% - 4px); text-align: center; }
+      .example-btn { min-width: 100%; }
+    }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <section class="hero">
+      <div class="hero-top">
+        <div class="hero-copy">
+          <div class="eyebrow">Pilot Prototype · Draft-only · Internal use only</div>
+          <h1>From Request to Response</h1>
+          <p>
+            A clickable thin-slice prototype for the <strong>Agentic Solutioning System for Enterprise Deal Shaping</strong>.
+            It turns an opportunity signal into a structured internal response pack, routes the work through a governed
+            human review gate, and shows the measurement layer needed to scale beyond a demo.
+          </p>
+          <div class="hero-actions">
+            <a class="button primary" href="#intake">Start a pilot request</a>
+            <button class="button ghost" id="loadBestExample">Load best demo example</button>
+          </div>
+          <div class="tag-row">
+            <span class="chip">Read-only sources</span>
+            <span class="chip">Draft-only output</span>
+            <span class="chip">Human review required</span>
+            <span class="chip">Evidence-linked response pack</span>
+          </div>
+        </div>
+        <div class="status-stack">
+          <div class="status-card">
+            <h3>Thin-slice goal</h3>
+            <strong>Intake → response pack → review → logged decision</strong>
+            <span class="sub">Built to prove workflow improvement, not autonomous customer delivery.</span>
+          </div>
+          <div class="status-card">
+            <h3>Pilot boundary</h3>
+            <strong>Curated knowledge base + clear review gates</strong>
+            <span class="sub">No live CRM write-back, no pricing commitment, no external send.</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <div class="tabs" role="tablist" aria-label="Prototype views">
+      <button class="tab active" data-view="intake">1. Intake</button>
+      <button class="tab" data-view="workbench">2. Response workbench</button>
+      <button class="tab" data-view="review">3. Human review</button>
+      <button class="tab" data-view="kpis">4. KPI cockpit</button>
+      <button class="tab" data-view="architecture">5. Architecture & controls</button>
+    </div>
+
+    <section class="view two-col active" id="view-intake">
+      <div class="card" id="intake">
+        <div class="card-head">
+          <div>
+            <h2>Pilot request intake</h2>
+            <div class="sub">Use the form to turn an ambiguous opportunity signal into a governed shaping request.</div>
+          </div>
+          <span class="route-pill route-amber" id="currentRoutePill">Route not yet assessed</span>
+        </div>
+        <div class="card-body">
+          <div class="toolbar">
+            <div>
+              <div class="mini">Synthetic demo cases</div>
+              <div class="sub">Preload a scenario to demo the thin slice in under five minutes.</div>
+            </div>
+            <div class="example-row">
+              <button class="example-btn" data-example="greenCase">
+                Discovery-led service desk modernisation
+                <small>Well-scoped, low sensitivity → likely Green</small>
+              </button>
+              <button class="example-btn" data-example="amberCase">
+                Managed network transformation RFP
+                <small>Material impact, complete evidence → likely Amber</small>
+              </button>
+              <button class="example-btn" data-example="redCase">
+                Regulated public-sector data platform renewal
+                <small>High sensitivity, restricted data → likely Red</small>
+              </button>
+            </div>
+          </div>
+
+          <div class="progress-wrap">
+            <div class="mini">Request completeness</div>
+            <div class="progress-track"><div class="progress-fill" id="completenessFill"></div></div>
+            <div class="sub" id="completenessText">Fill the core fields to make routing and drafting more reliable.</div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="requesterName">Requester name</label>
+              <input id="requesterName" placeholder="e.g. Uma Mudigonda" />
+            </div>
+            <div class="field">
+              <label for="requesterRole">Role / team</label>
+              <input id="requesterRole" placeholder="e.g. Deal Lead, Solutions, Bid Manager" />
+            </div>
+            <div class="field">
+              <label for="accountName">Account / client</label>
+              <input id="accountName" placeholder="e.g. NorthRiver Utilities" />
+            </div>
+            <div class="field">
+              <label for="opportunityType">Opportunity type</label>
+              <select id="opportunityType">
+                <option value="">Select one</option>
+                <option>Discovery-led opportunity</option>
+                <option>RFI / RFP response</option>
+                <option>Renewal / expansion</option>
+                <option>Strategic transformation pursuit</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="timeline">Response horizon</label>
+              <input id="timeline" placeholder="e.g. Executive readout in 48 hours" />
+            </div>
+            <div class="field">
+              <label for="sensitivity">Data / deal sensitivity</label>
+              <select id="sensitivity">
+                <option value="">Select one</option>
+                <option>Low</option>
+                <option>Medium</option>
+                <option>High</option>
+                <option>Restricted / regulated</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="field">
+            <label for="businessProblem">Business problem / opportunity signal</label>
+            <textarea id="businessProblem" placeholder="Describe the customer ask, the workflow pain, and what makes the opportunity real."></textarea>
+            <div class="helper">Best input: the customer's business issue, the likely buying centre, and what decision needs to be shaped.</div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="availableInputs">Approved inputs / knowledge sources</label>
+              <textarea id="availableInputs" placeholder="Proposal library, approved architectures, account plan, discovery notes, delivery playbooks..."></textarea>
+              <div class="helper">This pilot is grounded only in approved internal sources. No open-web reasoning, no unapproved collateral.</div>
+            </div>
+            <div class="field">
+              <label for="constraintsRisks">Constraints / known risks</label>
+              <textarea id="constraintsRisks" placeholder="Sensitive data, incumbent constraints, delivery timelines, compliance issues, pricing sensitivity..."></textarea>
+              <div class="helper">Call out privacy, regulatory exposure, missing data, unusual terms, or anything that should slow the workflow down.</div>
+            </div>
+          </div>
+
+          <div class="grid-2">
+            <div class="field">
+              <label for="successCriteria">Success criteria</label>
+              <textarea id="successCriteria" placeholder="What would count as a useful first-pass pack? Time saved, better structure, faster exec alignment..."></textarea>
+              <div class="helper">Use measurable outcomes where possible: first draft speed, reuse of approved patterns, quality of internal briefing.</div>
+            </div>
+            <div class="field">
+              <label for="desiredOutput">Needed output</label>
+              <textarea id="desiredOutput" placeholder="Executive briefing, response pack, shaping hypotheses, clarifying questions, review draft..."></textarea>
+              <div class="helper">Keep it internal. This pilot never sends customer-facing content autonomously.</div>
+            </div>
+          </div>
+
+          <div class="hero-actions" style="margin-top:18px;">
+            <button class="button primary" id="generateBtn">Generate governed response pack</button>
+            <button class="button ghost" id="resetBtn">Reset</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Pilot fit check</h3>
+            <div class="sub">The prototype mirrors your documented pilot boundary: limited opportunity types, curated sources, and explicit review gates.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-2">
+            <div class="score">
+              <div class="mini">Pilot mode</div>
+              <strong>Read-only</strong>
+              <div class="sub">The system retrieves from embedded, approved artefacts only.</div>
+            </div>
+            <div class="score">
+              <div class="mini">Output authority</div>
+              <strong>Draft-only</strong>
+              <div class="sub">No autonomous send, submit, commit, or commercial promise.</div>
+            </div>
+            <div class="score">
+              <div class="mini">Review model</div>
+              <strong>Green / Amber / Red</strong>
+              <div class="sub">Route logic determines whether the pack is auto-cleared, reviewed, or held.</div>
+            </div>
+            <div class="score">
+              <div class="mini">Traceability</div>
+              <strong>Evidence-linked</strong>
+              <div class="sub">Every major recommendation is linked to an approved source or clearly labelled inference.</div>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="note">
+            This is intentionally not the full target architecture. It is the smallest governed slice that proves the workflow: intake, retrieval, first-pass pack, review gate, and logged decision.
+          </div>
+          <div class="footer-note">
+            Recommended live demo path: load the amber example, click <span class="mono">Generate governed response pack</span>, then jump to the Human Review and KPI Cockpit tabs.
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view two-col" id="view-workbench">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Response workbench</h2>
+            <div class="sub">Structured internal pack assembled from approved patterns, risks, and evidence. This is where the agent helps judgement; it does not replace it.</div>
+          </div>
+          <div class="tag-row" id="evidenceSummaryTags"></div>
+        </div>
+        <div class="card-body">
+          <div id="emptyWorkbench" class="note">
+            Generate a pilot request first. The workbench will then assemble an internal response pack with grounded findings, labelled inferences, and a draft executive brief.
+          </div>
+          <div id="packContent" style="display:none;">
+            <div class="pack-grid">
+              <div class="pack-card">
+                <h4>Opportunity summary</h4>
+                <p id="opportunitySummary"></p>
+              </div>
+              <div class="pack-card">
+                <h4>Likely business priorities</h4>
+                <ul class="list" id="businessPriorities"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Recommended solution patterns</h4>
+                <ul class="list" id="solutionPatterns"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Why these patterns fit</h4>
+                <ul class="list" id="patternFit"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Assumptions</h4>
+                <ul class="list" id="assumptionsList"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Dependencies</h4>
+                <ul class="list" id="dependenciesList"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Delivery & commercial risks</h4>
+                <ul class="list" id="deliveryRisks"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Governance risks</h4>
+                <ul class="list" id="governanceRisks"></ul>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="pack-grid">
+              <div class="pack-card">
+                <h4>Clarifying questions for the team</h4>
+                <ul class="list" id="questionsList"></ul>
+              </div>
+              <div class="pack-card">
+                <h4>Executive briefing draft</h4>
+                <p id="executiveBrief"></p>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="pack-card">
+              <h4>Evidence trail</h4>
+              <div id="evidenceTrail"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Agent run log</h3>
+            <div class="sub">A simplified audit trail showing what the pilot looked at, how it routed the work, and where human review is still required.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="log-list" id="runLog">
+            <li><strong>Waiting for input.</strong><br><span class="sub">No request has been processed yet.</span></li>
+          </ul>
+          <div class="divider"></div>
+          <div class="section-title">Current pilot controls in force</div>
+          <ul class="list">
+            <li>Approved-source retrieval only</li>
+            <li>Role-based routing by sensitivity and evidence completeness</li>
+            <li>Confidence labels that separate grounded retrieval from inference</li>
+            <li>Human review before any customer-facing use</li>
+            <li>Logged decisions and manual override tracking</li>
+          </ul>
+          <div class="footer-note">This log is synthetic but intentionally shaped like the minimum evidence trail a sponsor or risk partner would expect.</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view two-col" id="view-review">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Human review gateway</h2>
+            <div class="sub">Low-risk, evidence-complete work can clear quickly. Material, ambiguous, or restricted work pauses for accountable human review.</div>
+          </div>
+          <span id="reviewRoute" class="route-pill route-amber">Awaiting request</span>
+        </div>
+        <div class="card-body">
+          <div id="emptyReview" class="note">Generate a request to populate the queue item, route rationale, evidence pack, and reviewer actions.</div>
+          <div id="reviewContent" style="display:none;">
+            <div class="review-item">
+              <div class="review-head">
+                <div>
+                  <div class="mini">Pending item</div>
+                  <h3 id="reviewTitle" style="margin: 6px 0 0;"></h3>
+                  <div class="sub" id="reviewMeta"></div>
+                </div>
+                <div id="routeReasonTags"></div>
+              </div>
+              <div class="grid-2">
+                <div>
+                  <div class="section-title">Why it routed this way</div>
+                  <ul class="list" id="routeReasons"></ul>
+                </div>
+                <div>
+                  <div class="section-title">Evidence pack</div>
+                  <ul class="list" id="evidencePackList"></ul>
+                </div>
+              </div>
+              <div class="divider"></div>
+              <div class="review-actions">
+                <button class="button primary" id="approveBtn">Approve draft for internal use</button>
+                <button class="button ghost" id="reviseBtn">Return for revision</button>
+                <button class="button ghost" id="holdBtn">Place hold / escalate</button>
+              </div>
+            </div>
+            <div class="divider"></div>
+            <div class="note" id="reviewOutcome">
+              No reviewer action yet. The workflow is paused at the gateway.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h3>Pilot review model</h3>
+            <div class="sub">This is the minimal review logic needed to de-risk the thin slice before any scale conversation.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <ul class="review-list">
+            <li>
+              <strong>Green</strong><br>
+              <span class="sub">Low sensitivity, complete evidence, internal-only use. Auto-cleared for internal draft circulation, still logged.</span>
+            </li>
+            <li>
+              <strong>Amber</strong><br>
+              <span class="sub">Material impact or incomplete evidence. Named reviewer must approve or return the draft.</span>
+            </li>
+            <li>
+              <strong>Red</strong><br>
+              <span class="sub">Restricted data, compliance conflict, or unsupported claims. Hold and escalate before any use.</span>
+            </li>
+          </ul>
+          <div class="divider"></div>
+          <div class="section-title">Prototype review thresholds</div>
+          <ul class="list">
+            <li>Restricted / regulated sensitivity automatically triggers Red.</li>
+            <li>Missing critical fields or incomplete source coverage trigger Amber.</li>
+            <li>Open questions on pricing, legal, or compliance claims suppress Green clearance.</li>
+            <li>Every override is logged to support pilot learning and governance evidence.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-kpis">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Pilot KPI cockpit</h2>
+            <div class="sub">A balanced scorecard that measures speed, quality, governance, and adoption. Figures below are simulated to show what the pilot would track from week one.</div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="grid-4" id="metricCards"></div>
+          <div class="divider"></div>
+          <div class="grid-2">
+            <div>
+              <div class="section-title">Baseline vs pilot comparison</div>
+              <div class="bar-compare" id="comparisonBars"></div>
+            </div>
+            <div>
+              <div class="section-title">Operating rhythm</div>
+              <ul class="list">
+                <li><strong>Weekly pilot ops review</strong><br><span class="sub">Review KPI deltas, inspect top failures, choose one fix, verify next week.</span></li>
+                <li><strong>Threshold example</strong><br><span class="sub">Unsupported claim rate &gt; 8% → revert to mandatory review for all packs until retrieval or templates are corrected.</span></li>
+                <li><strong>Failure taxonomy</strong><br><span class="sub">Tag failures as retrieval, policy, ambiguity, workflow, or human-review delay.</span></li>
+                <li><strong>Scale gate</strong><br><span class="sub">Only expand scope when flow improves and governance stability remains inside threshold.</span></li>
+              </ul>
+            </div>
+          </div>
+          <div class="divider"></div>
+          <div class="note">
+            The KPI layer is not decoration. It is the control tower that converts “the prototype worked” into “the operating model is credible enough to scale.”
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="view" id="view-architecture">
+      <div class="card">
+        <div class="card-head">
+          <div>
+            <h2>Architecture and controls</h2>
+            <div class="sub">A deliberately narrow, governable architecture that matches the use case you documented: multi-agent reasoning under orchestration, with human accountability preserved.</div>
+          </div>
+        </div>
+        <div class="card-body architecture">
+          <div class="flow-row">
+            <div class="agent-box">
+              <h4>1. Intake</h4>
+              <p>Teams submit a shaping request with problem context, approved sources, constraints, and desired output.</p>
+            </div>
+            <div class="agent-box">
+              <h4>2. Opportunity Interpretation Agent</h4>
+              <p>Classifies the request, infers likely buying priorities, and identifies gaps that affect shaping quality.</p>
+            </div>
+            <div class="agent-box">
+              <h4>3. Solution Pattern Agent</h4>
+              <p>Retrieves reusable architectures, propositions, delivery models, and precedent cases from approved assets.</p>
+            </div>
+            <div class="agent-box">
+              <h4>4. Risk Agent</h4>
+              <p>Surfaces commercial, delivery, and dependency risks; flags missing assumptions and feasibility concerns.</p>
+            </div>
+            <div class="agent-box">
+              <h4>5. Governance Agent</h4>
+              <p>Assesses sensitivity, approval requirements, and policy concerns before any internal circulation.</p>
+            </div>
+            <div class="agent-box">
+              <h4>6. Executive Briefing Agent</h4>
+              <p>Synthesises the pack into a concise internal narrative for deal leaders and executive stakeholders.</p>
+            </div>
+            <div class="human-box">
+              <h4>7. Accountable human review</h4>
+              <p>Approves, revises, or escalates. The human remains the decision-maker for material outputs.</p>
+            </div>
+          </div>
+
+          <div class="divider"></div>
+
+          <div class="safeguards">
+            <div class="guardrail">
+              <h4>Core guardrails</h4>
+              <ul class="list">
+                <li>Read-only access in pilot mode</li>
+                <li>Draft-only operation with no autonomous external send</li>
+                <li>Role-based access tied to sensitivity</li>
+                <li>Approved-source retrieval and source traceability</li>
+                <li>Fallback to manual review when evidence is weak</li>
+              </ul>
+            </div>
+            <div class="guardrail">
+              <h4>Human review design</h4>
+              <ul class="list">
+                <li>Green / Amber / Red routing</li>
+                <li>Confidence labels and inference tags</li>
+                <li>Reviewer actions logged as evidence</li>
+                <li>No binding commercial or compliance claims without approval</li>
+                <li>Escalation for restricted data or ambiguous policy concerns</li>
+              </ul>
+            </div>
+            <div class="guardrail">
+              <h4>Production path after the pilot</h4>
+              <ul class="list">
+                <li>Connect Teams / Copilot as the front door</li>
+                <li>Integrate SharePoint, proposal libraries, CRM context, and delivery playbooks</li>
+                <li>Add authentication, permissions, and model telemetry</li>
+                <li>Expand opportunity categories only after KPI stability is proven</li>
+              </ul>
+            </div>
+            <div class="guardrail">
+              <h4>What this prototype intentionally leaves out</h4>
+              <ul class="list">
+                <li>Live LLM calls</li>
+                <li>CRM or workflow write-back</li>
+                <li>Pricing engine integration</li>
+                <li>Legal sign-off automation</li>
+                <li>Customer-facing submission</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="footer-note">
+            Synthetic prototype disclaimer: this file uses embedded mock opportunity data, an internal mock knowledge base, and deterministic generation logic to demonstrate the operating model without exposing live enterprise systems or customer information.
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+
+  <script>
+    const knowledgeBase = [
+      {
+        id: 'pattern-sdm',
+        title: 'Service Desk Modernisation Pattern',
+        appliesTo: ['Discovery-led opportunity', 'Renewal / expansion'],
+        keywords: ['service desk', 'incident', 'workplace', 'employee support', 'self-service', 'automation', 'it support'],
+        summary: 'Modernise employee support through workflow redesign, knowledge discipline, automation triage, and human escalation control.',
+        rationale: 'Useful when the client wants faster support response, lower manual triage, and a phased adoption path that preserves oversight.',
+        dependencies: ['Clean service catalogue', 'Knowledge owner', 'Escalation path to human agents'],
+        risks: ['Weak knowledge articles can reduce trust', 'Over-automation can misroute complex cases'],
+        evidence: 'Approved pattern library v3.2 · Service Desk Modernisation'
+      },
+      {
+        id: 'pattern-network',
+        title: 'Managed Network Transformation Pattern',
+        appliesTo: ['RFI / RFP response', 'Strategic transformation pursuit'],
+        keywords: ['network', 'wan', 'lan', 'noc', 'observability', 'managed services', 'transformation', 'telecom'],
+        summary: 'Combine transition planning, service governance, automation, observability, and phased migration to de-risk network transformation.',
+        rationale: 'Useful when the opportunity requires both operational stability and a visible improvement story for leadership.',
+        dependencies: ['Current-state network baseline', 'Transition governance', 'Security architecture alignment'],
+        risks: ['Hidden incumbent complexity', 'Incomplete estate visibility can distort effort estimates'],
+        evidence: 'Approved pattern library v3.2 · Managed Network Transformation'
+      },
+      {
+        id: 'pattern-cloud',
+        title: 'Regulated Cloud & Data Platform Pattern',
+        appliesTo: ['RFI / RFP response', 'Renewal / expansion', 'Strategic transformation pursuit'],
+        keywords: ['data platform', 'regulated', 'public sector', 'sovereignty', 'compliance', 'cloud', 'security', 'analytics'],
+        summary: 'Support regulated transformation through segmented architecture, policy controls, data residency handling, and named approval paths.',
+        rationale: 'Useful when the opportunity includes sensitive data, regulatory obligations, or governance-heavy approval cycles.',
+        dependencies: ['Data classification', 'Security sign-off', 'Retention and residency model'],
+        risks: ['Unsupported compliance claims can damage trust', 'Policy gaps can delay the opportunity'],
+        evidence: 'Approved pattern library v3.2 · Regulated Cloud & Data Platform'
+      },
+      {
+        id: 'pattern-erp',
+        title: 'ERP Modernisation RunOps Pattern',
+        appliesTo: ['Renewal / expansion', 'Strategic transformation pursuit'],
+        keywords: ['erp', 'sap', 'runops', 'migration', 'finance', 'application management', 'ams'],
+        summary: 'Blend transformation and run operations with explicit business continuity controls, cutover governance, and support operating model design.',
+        rationale: 'Useful for opportunities where transformation value must be balanced against uptime and operational continuity.',
+        dependencies: ['Application inventory', 'Cutover governance', 'Business continuity owner'],
+        risks: ['Underestimating legacy dependencies', 'Transformation timing may conflict with fiscal cycles'],
+        evidence: 'Approved pattern library v3.2 · ERP Modernisation RunOps'
+      }
+    ];
+
+    const governanceRules = {
+      Low: {
+        route: 'Green',
+        note: 'Low sensitivity work can circulate internally when evidence is complete.'
+      },
+      Medium: {
+        route: 'Amber',
+        note: 'Medium sensitivity requires accountable review before broader internal use.'
+      },
+      High: {
+        route: 'Amber',
+        note: 'High sensitivity requires named reviewer approval and stronger traceability.'
+      },
+      'Restricted / regulated': {
+        route: 'Red',
+        note: 'Restricted or regulated work must be held and escalated before use.'
+      }
+    };
+
+    const examples = {
+      greenCase: {
+        requesterName: 'Uma Mudigonda',
+        requesterRole: 'Solutions Lead',
+        accountName: 'NorthRiver Services',
+        opportunityType: 'Discovery-led opportunity',
+        timeline: 'Internal readout in 72 hours',
+        sensitivity: 'Low',
+        businessProblem: 'Client wants to modernise employee IT support and reduce ticket bounce between service desk teams. Early discovery notes indicate high frustration with inconsistent first response and low reuse of existing knowledge assets.',
+        availableInputs: 'Discovery workshop notes; approved service desk modernisation pattern; ITSM maturity assessment; employee support backlog themes; approved transition checklist.',
+        constraintsRisks: 'No live customer data in pilot. Team wants a practical first-pass draft, not a full target operating model. Existing documentation quality is uneven.',
+        successCriteria: 'Useful first-pass pack in under one hour, with clear risks, assumptions, and recommended shaping questions for the next workshop.',
+        desiredOutput: 'Internal response pack and executive-ready summary for deal and practice leadership.'
+      },
+      amberCase: {
+        requesterName: 'Uma Mudigonda',
+        requesterRole: 'Deal Lead',
+        accountName: 'BlueHarbor Telecom',
+        opportunityType: 'RFI / RFP response',
+        timeline: 'Exec brief in 48 hours; draft shaping pack by tomorrow noon',
+        sensitivity: 'Medium',
+        businessProblem: 'Telecom client issued an RFP for network transformation and managed services. They want better operational visibility, lower incident resolution times, and a phased migration model with limited disruption to business-critical sites.',
+        availableInputs: 'RFP package; approved managed network transformation pattern; prior pursuit lessons learned; NOC service catalogue; account plan; approved solution propositions.',
+        constraintsRisks: 'Pricing is still manual. Estate baseline may be incomplete. Need to avoid overstating delivery certainty this early.',
+        successCriteria: 'Executive briefing that frames solution hypothesis, visible risks, dependencies, and areas requiring customer clarification before bid strategy is locked.',
+        desiredOutput: 'Internal exec brief, shaping hypotheses, dependency map, and clarifying question set.'
+      },
+      redCase: {
+        requesterName: 'Uma Mudigonda',
+        requesterRole: 'Bid Manager',
+        accountName: 'Civic Health Authority',
+        opportunityType: 'Renewal / expansion',
+        timeline: 'Board prep note in 24 hours',
+        sensitivity: 'Restricted / regulated',
+        businessProblem: 'Public-sector customer wants to renew and expand a regulated data platform. The deal includes sensitive citizen data, residency constraints, and pressure to present a governance-safe transformation path with named control owners.',
+        availableInputs: 'Existing renewal pack; regulated cloud pattern; risk register excerpts; service review notes; architecture summary; compliance checklists.',
+        constraintsRisks: 'Restricted data context, policy sensitivity, potential compliance claims, and incomplete confirmation of target-state residency requirements.',
+        successCriteria: 'Identify what can be safely shaped now, what must pause for review, and which claims require explicit evidence or approvals before inclusion.',
+        desiredOutput: 'Hold-ready internal pack with escalation points, not a circulation-ready draft.'
+      }
+    };
+
+    const kpis = [
+      {
+        label: 'Time to first structured pack',
+        baseline: 12,
+        pilot: 2.5,
+        unit: 'hrs',
+        direction: 'down',
+        owner: 'Deal Enablement Lead',
+        action: 'If pilot exceeds 4 hrs median, inspect retrieval quality and briefing templates.'
+      },
+      {
+        label: 'Traceable source coverage',
+        baseline: 42,
+        pilot: 96,
+        unit: '%',
+        direction: 'up',
+        owner: 'Knowledge Steward',
+        action: 'If coverage drops below 90%, freeze new scope and repair source mapping.'
+      },
+      {
+        label: 'Unsupported claim rate',
+        baseline: 18,
+        pilot: 4,
+        unit: '%',
+        direction: 'down',
+        owner: 'Governance Reviewer',
+        action: 'If rate exceeds 8%, switch all packs to mandatory review.'
+      },
+      {
+        label: 'Approved pattern reuse',
+        baseline: 28,
+        pilot: 71,
+        unit: '%',
+        direction: 'up',
+        owner: 'Solutions Practice Lead',
+        action: 'If reuse stalls, refresh pattern library and coach requesters on better inputs.'
+      }
+    ];
+
+    const comparisonMetrics = [
+      { name: 'Adoption on eligible opportunities', baseline: 0, pilot: 64, unit: '%' },
+      { name: 'Reviewer SLA within target', baseline: 61, pilot: 88, unit: '%' },
+      { name: 'Missed dependency rate', baseline: 22, pilot: 7, unit: '%' },
+      { name: 'Manual synthesis effort', baseline: 9, pilot: 3, unit: 'hrs' },
+      { name: 'Executive pack consistency score', baseline: 58, pilot: 86, unit: '/100' }
+    ];
+
+    const fields = [
+      'requesterName','requesterRole','accountName','opportunityType','timeline','sensitivity',
+      'businessProblem','availableInputs','constraintsRisks','successCriteria','desiredOutput'
+    ];
+
+    const coreFields = ['businessProblem','availableInputs','constraintsRisks','successCriteria'];
+
+    const el = (id) => document.getElementById(id);
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function collectForm() {
+      return Object.fromEntries(fields.map((field) => [field, el(field).value.trim()]));
+    }
+
+    function setForm(data) {
+      fields.forEach((field) => {
+        el(field).value = data[field] || '';
+      });
+      updateCompleteness();
+      assessRoutePreview();
+    }
+
+    function resetForm() {
+      fields.forEach((field) => { el(field).value = ''; });
+      updateCompleteness();
+      setPreviewRoute('Route not yet assessed', 'amber');
+      clearOutputs();
+    }
+
+    function computeCompleteness(data) {
+      const filled = coreFields.filter((field) => (data[field] || '').length > 0).length;
+      return Math.round((filled / coreFields.length) * 100);
+    }
+
+    function updateCompleteness() {
+      const data = collectForm();
+      const pct = computeCompleteness(data);
+      el('completenessFill').style.width = pct + '%';
+      el('completenessText').textContent = pct === 100
+        ? 'Core fields complete. Routing and drafting can proceed with higher confidence.'
+        : `${pct}% complete. Routing gets stronger when the workflow problem, inputs, risks, and success criteria are explicit.`;
+    }
+
+    function tokenize(text) {
+      return String(text || '').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    }
+
+    function matchPatterns(data) {
+      const tokens = tokenize(`${data.businessProblem} ${data.availableInputs} ${data.constraintsRisks} ${data.desiredOutput}`);
+      const type = data.opportunityType;
+      const scored = knowledgeBase.map((item) => {
+        let score = 0;
+        if (item.appliesTo.includes(type)) score += 3;
+        item.keywords.forEach((keyword) => {
+          if (tokens.includes(keyword.toLowerCase())) score += 1;
+        });
+        return { item, score };
+      }).sort((a, b) => b.score - a.score);
+
+      const selected = scored.filter((row) => row.score > 0).slice(0, 2).map((row) => row.item);
+      if (selected.length > 0) return selected;
+
+      if (type === 'RFI / RFP response') return [knowledgeBase[1], knowledgeBase[2]];
+      if (type === 'Discovery-led opportunity') return [knowledgeBase[0]];
+      if (type === 'Renewal / expansion') return [knowledgeBase[2], knowledgeBase[3]];
+      return [knowledgeBase[0], knowledgeBase[1]];
+    }
+
+    function determineRoute(data, completenessPct) {
+      const sensitivity = data.sensitivity;
+      const restricted = sensitivity === 'Restricted / regulated';
+      const high = sensitivity === 'High';
+      const problem = (data.businessProblem || '').toLowerCase();
+      const risks = (data.constraintsRisks || '').toLowerCase();
+      const needsHold = restricted || /restricted|regulated|citizen data|patient data|compliance claim|legal claim/.test(problem + ' ' + risks);
+      const missingCritical = completenessPct < 100 || !data.opportunityType || !data.timeline;
+      const materialImpact = /rfp|board|executive|network|transformation|managed service|renewal|expansion/.test(problem + ' ' + data.opportunityType.toLowerCase());
+
+      let route = 'Green';
+      const reasons = [];
+
+      if (needsHold) {
+        route = 'Red';
+        reasons.push('Restricted or regulated context requires hold-and-escalate before circulation.');
+      } else if (high || materialImpact || missingCritical || sensitivity === 'Medium') {
+        route = 'Amber';
+        if (materialImpact) reasons.push('Material opportunity impact requires accountable review even when the draft is useful.');
+        if (missingCritical) reasons.push('Evidence or request completeness is not strong enough for auto-clearance.');
+        if (high || sensitivity === 'Medium') reasons.push('Sensitivity level requires named reviewer sign-off.');
+      } else {
+        reasons.push('Low sensitivity and complete evidence allow internal draft circulation under pilot controls.');
+      }
+
+      const note = governanceRules[sensitivity]?.note || 'Default pilot review control applied.';
+      reasons.push(note);
+      return { route, reasons };
+    }
+
+    function setPreviewRoute(label, variant) {
+      const pill = el('currentRoutePill');
+      pill.textContent = label;
+      pill.className = `route-pill route-${variant}`;
+    }
+
+    function assessRoutePreview() {
+      const data = collectForm();
+      const pct = computeCompleteness(data);
+      if (!data.businessProblem && !data.sensitivity) {
+        setPreviewRoute('Route not yet assessed', 'amber');
+        return;
+      }
+      const result = determineRoute(data, pct);
+      setPreviewRoute(`Likely ${result.route} route`, result.route.toLowerCase());
+    }
+
+    function listItems(items) {
+      return items.map((item) => `<li>${escapeHtml(item)}</li>`).join('');
+    }
+
+    function makeExecutiveBrief(data, patterns, route) {
+      const patternTitles = patterns.map((item) => item.title).join(' and ');
+      const urgency = data.timeline || 'the next internal milestone';
+      const riskClause = route === 'Red'
+        ? 'Because the opportunity involves restricted or regulated concerns, the pack should be treated as a hold-ready briefing rather than a circulation-ready recommendation.'
+        : route === 'Amber'
+          ? 'Because the shaping decision is material and evidence is not fully self-sufficient, the pack should be reviewed by the named deal owner before wider circulation.'
+          : 'Because sensitivity is low and evidence is complete enough for pilot use, the draft can circulate internally while remaining clearly marked as non-customer-facing.';
+
+      return `${data.accountName || 'This opportunity'} appears to be a ${data.opportunityType || 'deal-shaping'} case where the primary need is to move quickly from signal to a disciplined internal point of view. The strongest initial fit is ${patternTitles}, because those approved patterns best match the stated workflow pain, likely buying priorities, and current delivery context. ${riskClause} The immediate next step is to validate the open assumptions, confirm dependencies, and decide whether the team is shaping for qualification, differentiation, or formal response strategy by ${urgency}.`;
+    }
+
+    function generateResponsePack(data) {
+      const completenessPct = computeCompleteness(data);
+      const patterns = matchPatterns(data);
+      const routeInfo = determineRoute(data, completenessPct);
+      const tokens = tokenize(`${data.businessProblem} ${data.constraintsRisks} ${data.successCriteria}`);
+      const hasSpeedTheme = tokens.some((t) => ['faster','speed','slow','delay','friction'].includes(t));
+      const hasRiskTheme = tokens.some((t) => ['risk','governance','compliance','security','regulated'].includes(t));
+
+      const priorities = [
+        hasSpeedTheme ? 'Compress the time from opportunity signal to first structured response.' : 'Increase the consistency of early-stage shaping across deal teams.',
+        'Reuse approved patterns rather than relying on individual recall or heroics.',
+        hasRiskTheme ? 'Surface governance and policy concerns before external commitments are implied.' : 'Make assumptions, dependencies, and trade-offs visible to leadership early.'
+      ];
+
+      const assumptions = [
+        'The available source set represents the most current approved internal material for this opportunity type.',
+        'Commercial pricing and final legal positions remain outside the pilot and will be handled manually.',
+        'The response pack is intended for internal review and challenge, not customer circulation.'
+      ];
+
+      if (!data.availableInputs.toLowerCase().includes('crm')) assumptions.push('Account context may be incomplete because CRM enrichment is not connected in this prototype.');
+      if ((data.constraintsRisks || '').length < 25) assumptions.push('Risk description from the requester is thin, so additional clarifying questions are necessary.');
+
+      const dependencies = [...new Set(patterns.flatMap((item) => item.dependencies))].slice(0, 5);
+      const deliveryRisks = [...new Set(patterns.flatMap((item) => item.risks))].slice(0, 4);
+      if (routeInfo.route !== 'Green') deliveryRisks.push('Reviewer throughput becomes a gating dependency for pilot cycle time.');
+
+      const governanceRisks = [];
+      if (data.sensitivity === 'Medium' || data.sensitivity === 'High') governanceRisks.push('Account sensitivity requires explicit reviewer sign-off before broader circulation.');
+      if (data.sensitivity === 'Restricted / regulated') governanceRisks.push('Restricted or regulated context prevents auto-clearance and requires escalation evidence.');
+      if (/pricing|legal|compliance/.test((data.constraintsRisks || '').toLowerCase() + ' ' + (data.businessProblem || '').toLowerCase())) {
+        governanceRisks.push('Potential commercial, legal, or compliance claims must remain tightly bounded and evidence-linked.');
+      }
+      governanceRisks.push('Source traceability must stay above pilot threshold to maintain trust in first-pass outputs.');
+
+      const questions = [
+        'What decision does the team need to make immediately after reading this pack: qualify, shape, or mobilise a formal response?',
+        'Which customer assumptions are facts, and which still need confirmation from the account team?',
+        'Which approval points would block movement from internal shaping to external positioning?',
+        'What differentiators are approved and evidence-backed enough to use in this pursuit?'
+      ];
+
+      if (routeInfo.route === 'Red') questions.push('Which restricted or regulated data elements need to be removed or abstracted before the pack can circulate?');
+      if (routeInfo.route === 'Amber') questions.push('Which missing facts would allow this pack to shift from Amber to Green in the next review cycle?');
+
+      const patternFit = patterns.map((item) => `${item.title} matches because ${item.rationale}`);
+      const executiveBrief = makeExecutiveBrief(data, patterns, routeInfo.route);
+      const summary = `${data.accountName || 'The opportunity'} is currently being shaped as a ${data.opportunityType || 'deal-shaping request'} with a requested turnaround of ${data.timeline || 'the next internal milestone'}. The pilot interprets the request as needing a faster, more evidence-led internal point of view before the team commits to a full response strategy.`;
+
+      const evidence = patterns.map((item) => ({
+        title: item.title,
+        source: item.evidence,
+        summary: item.summary
+      }));
+      evidence.push({
+        title: 'Pilot operating policy',
+        source: 'Pilot guardrail pack · Draft-only, read-only, human-reviewed',
+        summary: 'The workflow cannot send externally or make binding commitments.'
+      });
+      if (routeInfo.route !== 'Green') {
+        evidence.push({
+          title: 'Routing rule',
+          source: `Sensitivity rule · ${data.sensitivity || 'Unspecified'} context`,
+          summary: routeInfo.reasons[0]
+        });
+      }
+
+      return { completenessPct, patterns, routeInfo, priorities, assumptions, dependencies, deliveryRisks, governanceRisks, questions, patternFit, executiveBrief, summary, evidence };
+    }
+
+    function updateRunLog(data, pack) {
+      const entries = [
+        `Request received from ${data.requesterName || 'unknown requester'} for ${data.accountName || 'an unnamed account'}.`,
+        `Opportunity Interpretation Agent classified the request as ${data.opportunityType || 'unspecified opportunity'} and calculated ${pack.completenessPct}% completeness.`,
+        `Solution Pattern Agent retrieved ${pack.patterns.map((item) => item.title).join(' + ')} from approved pilot sources.`,
+        `Risk Agent surfaced ${pack.deliveryRisks.length} delivery/commercial risks and ${pack.governanceRisks.length} governance risks.`,
+        `Governance Agent applied a ${pack.routeInfo.route} route based on sensitivity and evidence completeness.`,
+        'Executive Briefing Agent produced an internal-only pack with grounded findings and labelled inferences.'
+      ];
+
+      el('runLog').innerHTML = entries.map((entry, index) => {
+        const labels = [
+          'Intake logged',
+          'Interpretation complete',
+          'Patterns retrieved',
+          'Risks surfaced',
+          'Route assigned',
+          'Draft assembled'
+        ];
+        return `<li><strong>${labels[index]}</strong><br><span class="sub">${escapeHtml(entry)}</span></li>`;
+      }).join('');
+    }
+
+    function renderPack(data, pack) {
+      el('emptyWorkbench').style.display = 'none';
+      el('packContent').style.display = 'block';
+      el('opportunitySummary').textContent = pack.summary;
+      el('businessPriorities').innerHTML = listItems(pack.priorities);
+      el('solutionPatterns').innerHTML = pack.patterns.map((item) => `<li><strong>${escapeHtml(item.title)}</strong><br><span class="sub">${escapeHtml(item.summary)}</span></li>`).join('');
+      el('patternFit').innerHTML = listItems(pack.patternFit);
+      el('assumptionsList').innerHTML = listItems(pack.assumptions);
+      el('dependenciesList').innerHTML = listItems(pack.dependencies);
+      el('deliveryRisks').innerHTML = listItems(pack.deliveryRisks);
+      el('governanceRisks').innerHTML = listItems(pack.governanceRisks);
+      el('questionsList').innerHTML = listItems(pack.questions);
+      el('executiveBrief').textContent = pack.executiveBrief;
+      el('evidenceTrail').innerHTML = pack.evidence.map((item) => {
+        return `<div class="pack-card" style="margin-bottom:10px;">
+          <h4>${escapeHtml(item.title)}</h4>
+          <div class="evidence-tag grounded">Grounded source</div>
+          <div class="sub" style="margin-top:8px;"><strong>${escapeHtml(item.source)}</strong></div>
+          <p style="margin-top:8px;">${escapeHtml(item.summary)}</p>
+        </div>`;
+      }).join('');
+      el('evidenceSummaryTags').innerHTML = `
+        <span class="evidence-tag grounded">${pack.evidence.length} linked sources</span>
+        <span class="evidence-tag inference">${pack.routeInfo.route} route</span>
+      `;
+    }
+
+    function renderReview(data, pack) {
+      el('emptyReview').style.display = 'none';
+      el('reviewContent').style.display = 'block';
+      const routeLower = pack.routeInfo.route.toLowerCase();
+      const routeLabel = `${pack.routeInfo.route} review path`;
+      el('reviewRoute').className = `route-pill route-${routeLower}`;
+      el('reviewRoute').textContent = routeLabel;
+      el('reviewTitle').textContent = `${data.accountName || 'Unnamed account'} · ${data.opportunityType || 'Unspecified opportunity'}`;
+      el('reviewMeta').textContent = `${data.requesterRole || 'Unknown role'} requested an internal pack for ${data.timeline || 'an unspecified horizon'} · Sensitivity: ${data.sensitivity || 'unspecified'}`;
+      el('routeReasons').innerHTML = listItems(pack.routeInfo.reasons);
+      el('evidencePackList').innerHTML = pack.evidence.map((item) => `<li><strong>${escapeHtml(item.title)}</strong><br><span class="sub">${escapeHtml(item.source)}</span></li>`).join('');
+      el('routeReasonTags').innerHTML = `
+        <span class="risk-tag">${escapeHtml(data.sensitivity || 'No sensitivity set')}</span>
+        <span class="risk-tag">${pack.completenessPct}% complete</span>
+        <span class="risk-tag">${pack.patterns.length} pattern(s) matched</span>
+      `;
+      el('reviewOutcome').textContent = 'No reviewer action yet. The workflow is paused at the gateway.';
+    }
+
+    function updateOutcome(message, variant) {
+      const outcome = el('reviewOutcome');
+      outcome.textContent = message;
+      outcome.style.background = variant === 'approve'
+        ? 'rgba(34,197,94,0.10)'
+        : variant === 'hold'
+          ? 'rgba(239,68,68,0.10)'
+          : 'rgba(245,158,11,0.10)';
+      outcome.style.borderColor = variant === 'approve'
+        ? 'rgba(34,197,94,0.24)'
+        : variant === 'hold'
+          ? 'rgba(239,68,68,0.20)'
+          : 'rgba(245,158,11,0.22)';
+    }
+
+    function clearOutputs() {
+      el('emptyWorkbench').style.display = 'block';
+      el('packContent').style.display = 'none';
+      el('evidenceSummaryTags').innerHTML = '';
+      el('runLog').innerHTML = '<li><strong>Waiting for input.</strong><br><span class="sub">No request has been processed yet.</span></li>';
+      el('emptyReview').style.display = 'block';
+      el('reviewContent').style.display = 'none';
+      el('reviewRoute').className = 'route-pill route-amber';
+      el('reviewRoute').textContent = 'Awaiting request';
+      updateOutcome('No reviewer action yet. The workflow is paused at the gateway.', 'revise');
+    }
+
+    function buildMetricCards() {
+      el('metricCards').innerHTML = kpis.map((metric) => {
+        const improvement = metric.direction === 'down'
+          ? (((metric.baseline - metric.pilot) / metric.baseline) * 100)
+          : (((metric.pilot - metric.baseline) / Math.max(metric.baseline, 1)) * 100);
+        const deltaSymbol = improvement >= 0 ? '▲' : '▼';
+        const deltaClass = improvement >= 0 ? 'up' : 'down';
+        return `
+          <div class="metric-card">
+            <div class="mini">${escapeHtml(metric.label)}</div>
+            <strong>${metric.pilot}${escapeHtml(metric.unit)}</strong>
+            <div class="sub">Baseline ${metric.baseline}${escapeHtml(metric.unit)} · Owner: ${escapeHtml(metric.owner)}</div>
+            <div class="delta ${deltaClass}" style="margin-top:10px;font-weight:700;">${deltaSymbol} ${Math.abs(improvement).toFixed(0)}% vs baseline</div>
+            <div class="sub" style="margin-top:10px;">${escapeHtml(metric.action)}</div>
+          </div>
+        `;
+      }).join('');
+
+      el('comparisonBars').innerHTML = comparisonMetrics.map((metric) => {
+        const max = Math.max(metric.baseline, metric.pilot, 100);
+        const baseWidth = (metric.baseline / max) * 100;
+        const pilotWidth = (metric.pilot / max) * 100;
+        return `
+          <div>
+            <div class="mini" style="margin-bottom:6px;">${escapeHtml(metric.name)}</div>
+            <div class="bar-row baseline">
+              <span class="sub">Baseline</span>
+              <div class="bar-track"><div class="bar-fill" style="width:${baseWidth}%;"></div></div>
+              <span class="sub">${metric.baseline}${escapeHtml(metric.unit)}</span>
+            </div>
+            <div class="bar-row">
+              <span class="sub">Pilot</span>
+              <div class="bar-track"><div class="bar-fill" style="width:${pilotWidth}%;"></div></div>
+              <span class="sub">${metric.pilot}${escapeHtml(metric.unit)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function switchView(name) {
+      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.view === name));
+      document.querySelectorAll('.view').forEach((view) => view.classList.remove('active'));
+      el(`view-${name}`).classList.add('active');
+    }
+
+    let currentPack = null;
+    let currentData = null;
+
+    function generate() {
+      const data = collectForm();
+      const pack = generateResponsePack(data);
+      currentData = data;
+      currentPack = pack;
+      setPreviewRoute(`Current ${pack.routeInfo.route} route`, pack.routeInfo.route.toLowerCase());
+      renderPack(data, pack);
+      renderReview(data, pack);
+      updateRunLog(data, pack);
+      switchView('workbench');
+    }
+
+    document.querySelectorAll('.tab').forEach((tab) => {
+      tab.addEventListener('click', () => switchView(tab.dataset.view));
+    });
+
+    document.querySelectorAll('.example-btn').forEach((button) => {
+      button.addEventListener('click', () => setForm(examples[button.dataset.example]));
+    });
+
+    el('loadBestExample').addEventListener('click', () => {
+      setForm(examples.amberCase);
+      switchView('intake');
+      window.location.hash = 'intake';
+    });
+
+    el('generateBtn').addEventListener('click', generate);
+    el('resetBtn').addEventListener('click', resetForm);
+
+    fields.forEach((field) => {
+      el(field).addEventListener('input', () => {
+        updateCompleteness();
+        assessRoutePreview();
+      });
+      el(field).addEventListener('change', () => {
+        updateCompleteness();
+        assessRoutePreview();
+      });
+    });
+
+    el('approveBtn').addEventListener('click', () => {
+      if (!currentPack || !currentData) return;
+      updateOutcome('Reviewer action: approved for internal-only circulation with existing pilot guardrails. External use still prohibited.', 'approve');
+      el('runLog').innerHTML += `<li><strong>Reviewer approved</strong><br><span class="sub">Named reviewer cleared the draft for internal circulation only. Decision captured in the audit trail.</span></li>`;
+      switchView('review');
+    });
+
+    el('reviseBtn').addEventListener('click', () => {
+      if (!currentPack || !currentData) return;
+      updateOutcome('Reviewer action: returned for revision. Team must strengthen assumptions, evidence, or risk framing before reuse.', 'revise');
+      el('runLog').innerHTML += `<li><strong>Revision requested</strong><br><span class="sub">Reviewer asked for stronger evidence coverage and clearer shaping assumptions.</span></li>`;
+      switchView('review');
+    });
+
+    el('holdBtn').addEventListener('click', () => {
+      if (!currentPack || !currentData) return;
+      updateOutcome('Reviewer action: hold / escalate. The item remains blocked pending risk, compliance, or executive review.', 'hold');
+      el('runLog').innerHTML += `<li><strong>Hold and escalate</strong><br><span class="sub">The pack was paused because the route or evidence profile exceeds pilot authority.</span></li>`;
+      switchView('review');
+    });
+
+    buildMetricCards();
+    updateCompleteness();
+  </script>
+</body>
+</html>
