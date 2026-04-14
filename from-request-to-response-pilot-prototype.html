@@ -14,8 +14,8 @@
       --line: rgba(255,255,255,0.08);
       --text: #e8ecf6;
       --muted: #9ca6bf;
-      --accent: #60a5fa;
-      --accent-2: #2dd4bf;
+      --accent: #f472b6;
+      --accent-2: #22d3ee;
       --green: #22c55e;
       --amber: #f59e0b;
       --red: #ef4444;
@@ -41,6 +41,27 @@
 
     a { color: inherit; }
     button, input, select, textarea { font: inherit; }
+    :focus-visible {
+      outline: 3px solid rgba(96,165,250,0.75);
+      outline-offset: 2px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -999px;
+      top: 8px;
+      background: #0f1a33;
+      color: #e8ecf6;
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      padding: 10px 12px;
+      z-index: 1000;
+    }
+
+    .skip-link:focus {
+      left: 8px;
+    }
+
 
     .shell {
       max-width: var(--max);
@@ -150,6 +171,12 @@
 
     .button:hover { transform: translateY(-1px); }
     .button:active { transform: translateY(0); }
+    .button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+      box-shadow: none;
+    }
 
     .button.primary {
       background: linear-gradient(135deg, var(--accent), #7c9cff);
@@ -685,6 +712,16 @@
       line-height: 1.6;
     }
 
+    .validation-note {
+      margin-top: 12px;
+      padding: 10px 12px;
+      border-radius: 12px;
+      background: rgba(245,158,11,0.12);
+      border: 1px solid rgba(245,158,11,0.3);
+      font-size: 13px;
+      color: #ffe8bd;
+    }
+
     .mono {
       font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
     }
@@ -718,7 +755,8 @@
   </style>
 </head>
 <body>
-  <div class="shell">
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+  <main class="shell" id="main-content">
     <section class="hero">
       <div class="hero-top">
         <div class="hero-copy">
@@ -756,14 +794,14 @@
     </section>
 
     <div class="tabs" role="tablist" aria-label="Prototype views">
-      <button class="tab active" data-view="intake">1. Intake</button>
-      <button class="tab" data-view="workbench">2. Response workbench</button>
-      <button class="tab" data-view="review">3. Human review</button>
-      <button class="tab" data-view="kpis">4. KPI cockpit</button>
-      <button class="tab" data-view="architecture">5. Architecture & controls</button>
+      <button class="tab active" data-view="intake" role="tab" aria-selected="true" aria-controls="view-intake" id="tab-intake">1. Intake</button>
+      <button class="tab" data-view="workbench" role="tab" aria-selected="false" aria-controls="view-workbench" id="tab-workbench">2. Response workbench</button>
+      <button class="tab" data-view="review" role="tab" aria-selected="false" aria-controls="view-review" id="tab-review">3. Human review</button>
+      <button class="tab" data-view="kpis" role="tab" aria-selected="false" aria-controls="view-kpis" id="tab-kpis">4. KPI cockpit</button>
+      <button class="tab" data-view="architecture" role="tab" aria-selected="false" aria-controls="view-architecture" id="tab-architecture">5. Architecture & controls</button>
     </div>
 
-    <section class="view two-col active" id="view-intake">
+    <section class="view two-col active" id="view-intake" role="tabpanel" aria-labelledby="tab-intake">
       <div class="card" id="intake">
         <div class="card-head">
           <div>
@@ -877,6 +915,7 @@
             <button class="button primary" id="generateBtn">Generate governed response pack</button>
             <button class="button ghost" id="resetBtn">Reset</button>
           </div>
+          <div class="validation-note" id="validationNote" aria-live="polite"></div>
         </div>
       </div>
 
@@ -921,7 +960,7 @@
       </div>
     </section>
 
-    <section class="view two-col" id="view-workbench">
+    <section class="view two-col" id="view-workbench" role="tabpanel" aria-labelledby="tab-workbench">
       <div class="card">
         <div class="card-head">
           <div>
@@ -1014,7 +1053,7 @@
       </div>
     </section>
 
-    <section class="view two-col" id="view-review">
+    <section class="view two-col" id="view-review" role="tabpanel" aria-labelledby="tab-review">
       <div class="card">
         <div class="card-head">
           <div>
@@ -1094,7 +1133,7 @@
       </div>
     </section>
 
-    <section class="view" id="view-kpis">
+    <section class="view" id="view-kpis" role="tabpanel" aria-labelledby="tab-kpis">
       <div class="card">
         <div class="card-head">
           <div>
@@ -1128,7 +1167,7 @@
       </div>
     </section>
 
-    <section class="view" id="view-architecture">
+    <section class="view" id="view-architecture" role="tabpanel" aria-labelledby="tab-architecture">
       <div class="card">
         <div class="card-head">
           <div>
@@ -1219,7 +1258,7 @@
         </div>
       </div>
     </section>
-  </div>
+  </main>
 
   <script>
     const knowledgeBase = [
@@ -1412,6 +1451,7 @@
       updateCompleteness();
       setPreviewRoute('Route not yet assessed', 'amber');
       clearOutputs();
+      updateGenerateState();
     }
 
     function computeCompleteness(data) {
@@ -1426,6 +1466,30 @@
       el('completenessText').textContent = pct === 100
         ? 'Core fields complete. Routing and drafting can proceed with higher confidence.'
         : `${pct}% complete. Routing gets stronger when the workflow problem, inputs, risks, and success criteria are explicit.`;
+    }
+
+    function getMissingCoreFields(data) {
+      return coreFields.filter((field) => !(data[field] || '').trim());
+    }
+
+    function updateGenerateState() {
+      const data = collectForm();
+      const missing = getMissingCoreFields(data);
+      const button = el('generateBtn');
+      const note = el('validationNote');
+      const labelMap = {
+        businessProblem: 'Business problem / opportunity signal',
+        availableInputs: 'Approved inputs / knowledge sources',
+        constraintsRisks: 'Constraints / known risks',
+        successCriteria: 'Success criteria'
+      };
+
+      button.disabled = missing.length > 0;
+      if (missing.length === 0) {
+        note.textContent = 'Ready to generate: all core fields are complete.';
+      } else {
+        note.textContent = `To generate, complete: ${missing.map((field) => labelMap[field]).join('; ')}.`;
+      }
     }
 
     function tokenize(text) {
@@ -1723,9 +1787,16 @@
     }
 
     function switchView(name) {
-      document.querySelectorAll('.tab').forEach((tab) => tab.classList.toggle('active', tab.dataset.view === name));
-      document.querySelectorAll('.view').forEach((view) => view.classList.remove('active'));
-      el(`view-${name}`).classList.add('active');
+      document.querySelectorAll('.tab').forEach((tab) => {
+        const isActive = tab.dataset.view === name;
+        tab.classList.toggle('active', isActive);
+        tab.setAttribute('aria-selected', String(isActive));
+      });
+      document.querySelectorAll('.view').forEach((view) => {
+        const isActive = view.id === `view-${name}`;
+        view.classList.toggle('active', isActive);
+        view.setAttribute('aria-hidden', String(!isActive));
+      });
     }
 
     let currentPack = null;
@@ -1743,8 +1814,18 @@
       switchView('workbench');
     }
 
-    document.querySelectorAll('.tab').forEach((tab) => {
+    const tabButtons = Array.from(document.querySelectorAll('.tab'));
+
+    tabButtons.forEach((tab, index) => {
       tab.addEventListener('click', () => switchView(tab.dataset.view));
+      tab.addEventListener('keydown', (event) => {
+        if (event.key !== 'ArrowRight' && event.key !== 'ArrowLeft') return;
+        event.preventDefault();
+        const direction = event.key === 'ArrowRight' ? 1 : -1;
+        const nextIndex = (index + direction + tabButtons.length) % tabButtons.length;
+        tabButtons[nextIndex].focus();
+        switchView(tabButtons[nextIndex].dataset.view);
+      });
     });
 
     document.querySelectorAll('.example-btn').forEach((button) => {
@@ -1764,10 +1845,12 @@
       el(field).addEventListener('input', () => {
         updateCompleteness();
         assessRoutePreview();
+        updateGenerateState();
       });
       el(field).addEventListener('change', () => {
         updateCompleteness();
         assessRoutePreview();
+        updateGenerateState();
       });
     });
 
@@ -1793,7 +1876,9 @@
     });
 
     buildMetricCards();
+    switchView('intake');
     updateCompleteness();
+    updateGenerateState();
   </script>
 </body>
 </html>
